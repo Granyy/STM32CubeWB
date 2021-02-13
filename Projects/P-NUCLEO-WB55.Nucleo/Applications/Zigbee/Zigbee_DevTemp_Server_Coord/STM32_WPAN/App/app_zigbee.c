@@ -32,10 +32,12 @@
 #include <assert.h>
 #include "zcl/zcl.h"
 #include "zcl/zcl.device.temp.h"
+#include "zigbee.aps.h"
+#include "llist.h"
 
 
 /* Private defines -----------------------------------------------------------*/
-#define APP_ZIGBEE_STARTUP_FAIL_DELAY               3000U
+#define APP_ZIGBEE_STARTUP_FAIL_DELAY               10000U
 #define SW1_ENDPOINT            17
 #define SW1_GROUP_ADDR          0x0001
 #define CHANNEL                 18
@@ -163,6 +165,20 @@ static void APP_ZIGBEE_StackLayersInit(void)
   UTIL_SEQ_SetTask(1U << CFG_TASK_ZIGBEE_NETWORK_FORM, CFG_SCH_PRIO_0);
 }
 
+void zcl_press_meas_press_client_config(struct ZbZclClusterT *clusterPtr, struct ZbApsdeDataIndT *dataIndPtr, uint16_t attributeId,
+    enum ZclStatusCodeT status, uint8_t direction)
+{
+    APP_DBG("COUCOUUUUU CONFIG");
+
+}
+
+void zcl_press_meas_press_client_report(struct ZbZclClusterT *clusterPtr, struct ZbApsdeDataIndT *dataIndPtr, uint16_t attributeId,
+    enum ZclDataTypeT dataType, const uint8_t *in_payload, uint16_t in_len)
+{
+    APP_DBG("COUCOUUUUU REPORT");
+
+}
+
 /**
  * @brief  Configure Zigbee application endpoints
  * @param  None
@@ -185,8 +201,30 @@ static void APP_ZIGBEE_ConfigEndpoints(void)
   /* device temperature Server */
   zigbee_app_info.device_temp_server = ZbZclDevTempServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT);
   assert(zigbee_app_info.device_temp_server != NULL);
+
+  uint16_t attr_size = ZCL_ATTR_LIST_LEN(zigbee_app_info.device_temp_server->attributeList);
+  APP_DBG("attr_size is %d", attr_size);
+  /*struct ZbZclAttrT test1 = (ZbZclAttrT)LINK_LIST_HEAD(zigbee_app_info.device_temp_server->attributeList);
+  for (int i=0; i<attr_size; i++)
+  {
+	  ZbZclAttrT* test1 = (ZbZclAttrT*)itr.next;
+	  if (test1 !=NULL)
+	  {
+		  APP_DBG("attr_id is %d", test1->attributeId);
+	  }
+	  else
+	  {
+		  APP_DBG("attr_id is NULL");
+	  }
+
+  }*/
+
+
   ZbZclClusterEndpointRegister(zigbee_app_info.device_temp_server);
+  zigbee_app_info.device_temp_server->report = &zcl_press_meas_press_client_report;
+  zigbee_app_info.device_temp_server->config = &zcl_press_meas_press_client_config;
 } /* config_endpoints */
+
 
 /**
  * @brief  Handle Zigbee network forming and joining
@@ -201,21 +239,21 @@ static void APP_ZIGBEE_NwkForm(void)
     enum ZbStatusCodeT status;
 
     /* Configure Zigbee Logging (only need to do this once, but this is a good place to put it) */
-    ZbSetLogging(zigbee_app_info.zb, ZB_LOG_MASK_LEVEL_5, NULL);
+    ZbSetLogging(zigbee_app_info.zb, ZB_LOG_MASK_LEVEL_ALL, NULL);
 
     /* Attempt to join a zigbee network */
     ZbStartupConfigGetProDefaults(&config);
 
     /* Set the centralized network */
     APP_DBG("Network config : APP_STARTUP_CENTRALIZED_COORD");
-    config.startupControl = ZbStartTypeForm;
+    config.startupControl = ZbStartTypeJoin;
 
     /* Using the default HA preconfigured Link Key */
     memcpy(config.security.preconfiguredLinkKey, sec_key_ha, ZB_SEC_KEYSIZE);
 
     config.channelList.count = 1;
     config.channelList.list[0].page = 0;
-    config.channelList.list[0].channelMask = 1 << CHANNEL; /*Channel in use */
+    config.channelList.list[0].channelMask = WPAN_CHANNELMASK_2400MHZ;//1 << CHANNEL; /*Channel in use */
 
     /* Using ZbStartupWait (blocking) here instead of ZbStartup, in order to demonstrate how to do
      * a blocking call on the M4. */
@@ -515,6 +553,20 @@ static void APP_ZIGBEE_SW2_Process()
   
   /*Read back current temperature */
   APP_ZIGBEE_ParseTempValue();
+
+
+  /*ZbApsmeBindReqT binreq;
+  binreq.clusterId = ZCL_CLUSTER_DEVICE_TEMPERATURE;
+  binreq.dst.mode = ZB_APSDE_ADDRMODE_SHORT;
+  binreq.dst.endpoint =SW1_ENDPOINT;
+  binreq.dst.nwkAddr = 0x0000;
+
+  binreq.srcEndpt = SW1_ENDPOINT;
+  binreq.srcExtAddr = 0x0000;*/
+
+  //ZbApsmeBindConfT binconf;
+  //ZbApsmeBindReq(zigbee_app_info.zb, &binreq, &binconf);
+
 }
 
 
