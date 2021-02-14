@@ -42,11 +42,6 @@
 #define APP_ZIGBEE_STARTUP_FAIL_DELAY               10000U
 #define SW1_ENDPOINT            17
 #define SW1_GROUP_ADDR          0x0001
-#define CHANNEL                 18
-
-#define ZCL_DEVICE_TEMP_INI     35
-#define ZCL_DEVICE_TEMP_LIMIT   50
-#define ZCL_DEVICE_TEMP_RESOL    2 
 
 /* external definition */
 enum ZbStatusCodeT ZbStartupWait(struct ZigBeeT *zb, struct ZbStartupT *config);
@@ -85,7 +80,6 @@ struct zigbee_app_info {
   uint32_t join_delay;
   /* cluster server */
   struct ZbZclClusterT *device_temp_server;
-  struct ZbZclClusterT *device_hum_server;
  };
 
 static struct zigbee_app_info zigbee_app_info;
@@ -168,20 +162,6 @@ static void APP_ZIGBEE_StackLayersInit(void)
   UTIL_SEQ_SetTask(1U << CFG_TASK_ZIGBEE_NETWORK_FORM, CFG_SCH_PRIO_0);
 }
 
-void zcl_press_meas_press_client_config(struct ZbZclClusterT *clusterPtr, struct ZbApsdeDataIndT *dataIndPtr, uint16_t attributeId,
-    enum ZclStatusCodeT status, uint8_t direction)
-{
-    APP_DBG("COUCOUUUUU CONFIG");
-
-}
-
-void zcl_press_meas_press_client_report(struct ZbZclClusterT *clusterPtr, struct ZbApsdeDataIndT *dataIndPtr, uint16_t attributeId,
-    enum ZclDataTypeT dataType, const uint8_t *in_payload, uint16_t in_len)
-{
-    APP_DBG("COUCOUUUUU REPORT");
-
-}
-
 /**
  * @brief  Configure Zigbee application endpoints
  * @param  None
@@ -200,39 +180,13 @@ static void APP_ZIGBEE_ConfigEndpoints(void)
   ZbZclAddEndpoint(zigbee_app_info.zb, &req, &conf);
   assert(conf.status == ZB_STATUS_SUCCESS);
   ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_TEMPERATURE, true);
-  //ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_HVAC_DEHUMIDIFIER, true);
 
   /* device temperature Server */
   zigbee_app_info.device_temp_server = ZbZclTempMeasServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_TEMP_MEAS_MIN_MEAS_VAL_MIN, ZCL_TEMP_MEAS_MAX_MEAS_VAL_MAX, 1);
   assert(zigbee_app_info.device_temp_server != NULL);
 
-  /*zigbee_app_info.device_hum_server = ZbZclDehumCtrlServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT);
-  assert(zigbee_app_info.device_hum_server != NULL);
-*/
-
-
-  uint16_t attr_size = ZCL_ATTR_LIST_LEN(zigbee_app_info.device_temp_server->attributeList);
-  APP_DBG("attr_size is %d", attr_size);
-  /*struct ZbZclAttrT test1 = (ZbZclAttrT)LINK_LIST_HEAD(zigbee_app_info.device_temp_server->attributeList);
-  for (int i=0; i<attr_size; i++)
-  {
-	  ZbZclAttrT* test1 = (ZbZclAttrT*)itr.next;
-	  if (test1 !=NULL)
-	  {
-		  APP_DBG("attr_id is %d", test1->attributeId);
-	  }
-	  else
-	  {
-		  APP_DBG("attr_id is NULL");
-	  }
-
-  }*/
-
-
-  //ZbZclClusterEndpointRegister(zigbee_app_info.device_temp_server);
-  //zigbee_app_info.device_temp_server->report = &zcl_press_meas_press_client_report;
-  //zigbee_app_info.device_temp_server->config = &zcl_press_meas_press_client_config;
-} /* config_endpoints */
+}
+/* config_endpoints */
 
 
 /**
@@ -262,7 +216,7 @@ static void APP_ZIGBEE_NwkForm(void)
 
     config.channelList.count = 1;
     config.channelList.list[0].page = 0;
-    config.channelList.list[0].channelMask = WPAN_CHANNELMASK_2400MHZ;//1 << CHANNEL; /*Channel in use */
+    config.channelList.list[0].channelMask = WPAN_CHANNELMASK_2400MHZ;
 
     /* Using ZbStartupWait (blocking) here instead of ZbStartup, in order to demonstrate how to do
      * a blocking call on the M4. */
@@ -320,28 +274,16 @@ static void APP_ZIGBEE_ConfigGroupAddr(void)
 static void APP_ZIGBEE_InitDevTemp()
 {
   enum ZclStatusCodeT status;
-  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, (int16_t)ZCL_DEVICE_TEMP_INI*100);
+  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, (int16_t)2000);
   if(status == ZCL_STATUS_SUCCESS)
   { 
-    APP_DBG("[DEV TEMP] Device Temperature initial value set at %d",(int16_t)(ZCL_DEVICE_TEMP_INI*1000)/2);
+    APP_DBG("[DEV TEMP] Device Temperature initial value set at %d",(int16_t)2000);
     BSP_LED_On(LED_GREEN);
   }
   else
   {
     APP_DBG("[DEV TEMP]Failed to initialize initial Temperature");
   }
-  /*status = ZbZclAttrIntegerWrite(zigbee_app_info.device_hum_server, ZCL_DEHUM_CTRL_SVR_ATTR_REL_HUM, (int16_t)ZCL_DEVICE_TEMP_INI);
-
-  if(status == ZCL_STATUS_SUCCESS)
-  {
-    APP_DBG("[DEV TEMP] Device Temperature initial value set at %d",(int16_t)(ZCL_DEVICE_TEMP_INI*1000)/2);
-    BSP_LED_On(LED_GREEN);
-  }
-  else
-  {
-    APP_DBG("[DEV TEMP]Failed to initialize initial Temperature");
-  }
-  */
 }
 
 
@@ -481,7 +423,7 @@ static void APP_ZIGBEE_ParseTempValue()
   min_temp_exp = (int16_t) ZbZclAttrIntegerRead(zigbee_app_info.device_temp_server, ZCL_DEV_TEMP_MIN_TEMP, &type, &status);
   max_temp_exp = (int16_t) ZbZclAttrIntegerRead(zigbee_app_info.device_temp_server, ZCL_DEV_TEMP_MAX_TEMP, &type, &status);
   
-  if(cur_temp > ZCL_DEVICE_TEMP_LIMIT)
+  if(cur_temp > 40)
   {
      BSP_LED_Off(LED_GREEN);
      BSP_LED_On(LED_RED);
@@ -526,13 +468,12 @@ static void APP_ZIGBEE_SW1_Process()
   /* Read the current temperature */
   current_temp = (int16_t)ZbZclAttrIntegerRead(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, &type, &status);
  
-  /* Increase +2C */
-  current_temp += ZCL_DEVICE_TEMP_RESOL;
+  /* Increase +0.1C */
+  current_temp += 10;
   
   /* Write new current temperature */
   status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
-  //status = ZbZclAttrIntegerWrite(zigbee_app_info.device_hum_server, ZCL_DEHUM_CTRL_SVR_ATTR_REL_HUM, current_temp);
-  APP_DBG("[DEV TEMP] Increase Temp by +2C");
+  APP_DBG("[DEV TEMP] Increase Temp by +0.1C");
   
   /*Read back current temperature */
   APP_ZIGBEE_ParseTempValue();
@@ -565,31 +506,15 @@ static void APP_ZIGBEE_SW2_Process()
   /* Read the current temperature */
   current_temp = (int16_t) ZbZclAttrIntegerRead(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, &type, &status);
  
-  /* Decrease +2C */
-  current_temp -= ZCL_DEVICE_TEMP_RESOL;
+  /* Decrease +0.1C */
+  current_temp -= 10;
   
   /* Write new current temperature */
   status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
-  APP_DBG("[DEV TEMP] Decrease Temp by -2C");
-  //status = ZbZclAttrIntegerWrite(zigbee_app_info.device_hum_server, ZCL_DEHUM_CTRL_SVR_ATTR_REL_HUM, current_temp);
+  APP_DBG("[DEV TEMP] Decrease Temp by -0.1C");
 
-  
   /*Read back current temperature */
   APP_ZIGBEE_ParseTempValue();
-
-
-  /*ZbApsmeBindReqT binreq;
-  binreq.clusterId = ZCL_CLUSTER_DEVICE_TEMPERATURE;
-  binreq.dst.mode = ZB_APSDE_ADDRMODE_SHORT;
-  binreq.dst.endpoint =SW1_ENDPOINT;
-  binreq.dst.nwkAddr = 0x0000;
-
-  binreq.srcEndpt = SW1_ENDPOINT;
-  binreq.srcExtAddr = 0x0000;*/
-
-  //ZbApsmeBindConfT binconf;
-  //ZbApsmeBindReq(zigbee_app_info.zb, &binreq, &binconf);
-
 }
 
 
