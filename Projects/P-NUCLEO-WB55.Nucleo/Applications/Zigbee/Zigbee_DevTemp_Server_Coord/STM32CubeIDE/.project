@@ -46,6 +46,12 @@
 			<type>1</type>
 			<locationURI>$%7BPARENT-6-PROJECT_LOC%7D/Drivers/STM32WBxx_HAL_Driver/Src/stm32wbxx_hal.c</locationURI>
 		</link>
+                <link>
+                        <name>Drivers/STM32WBxx_HAL_Driver/stm32wbxx_hal_i2c.c</name>
+                        <type>1</type>
+                        <locationURI>$%7BPARENT-6-PROJECT_LOC%7D/Drivers/STM32WBxx_HAL_Driver/Src/stm32wbxx_hal_i2c.c</locationURI>
+                </link>
+
 		<link>
 			<name>Drivers/STM32WBxx_HAL_Driver/stm32wbxx_hal_cortex.c</name>
 			<type>1</type>

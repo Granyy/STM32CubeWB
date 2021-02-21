@@ -33,7 +33,7 @@
 #include "zcl/zcl.h"
 #include "zcl/zcl.device.temp.h"
 #include "zcl/zcl.temp.meas.h"
-#include "zcl/zcl.dehum.ctrl.h"
+#include "zcl/zcl.water.content.meas.h"
 #include "zigbee.aps.h"
 #include "llist.h"
 
@@ -56,6 +56,7 @@ static void APP_ZIGBEE_SW2_Process(void);
 static void APP_ZIGBEE_TraceError(const char *pMess, uint32_t ErrCode);
 static void APP_ZIGBEE_CheckWirelessFirmwareInfo(void);
 static void APP_ZIGBEE_InitDevTemp(void);
+static void APP_ZIGBEE_InitDevHumi(void);
 static void Wait_Getting_Ack_From_M0(void);
 static void Receive_Ack_From_M0(void);
 static void Receive_Notification_From_M0(void);
@@ -80,6 +81,7 @@ struct zigbee_app_info {
   uint32_t join_delay;
   /* cluster server */
   struct ZbZclClusterT *device_temp_server;
+  struct ZbZclClusterT *device_humi_server;
  };
 
 static struct zigbee_app_info zigbee_app_info;
@@ -180,11 +182,13 @@ static void APP_ZIGBEE_ConfigEndpoints(void)
   ZbZclAddEndpoint(zigbee_app_info.zb, &req, &conf);
   assert(conf.status == ZB_STATUS_SUCCESS);
   ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_TEMPERATURE, true);
+  ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_HUMIDITY, true);
 
   /* device temperature Server */
   zigbee_app_info.device_temp_server = ZbZclTempMeasServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_TEMP_MEAS_MIN_MEAS_VAL_MIN, ZCL_TEMP_MEAS_MAX_MEAS_VAL_MAX, 1);
   assert(zigbee_app_info.device_temp_server != NULL);
-
+  zigbee_app_info.device_humi_server = ZbZclWaterContentMeasServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_HUMIDITY, ZCL_WC_MEAS_MIN_MEAS_VAL_MIN, ZCL_WC_MEAS_MIN_MEAS_VAL_MAX);
+  assert(zigbee_app_info.device_humi_server != NULL);
 }
 /* config_endpoints */
 
@@ -208,7 +212,7 @@ static void APP_ZIGBEE_NwkForm(void)
     ZbStartupConfigGetProDefaults(&config);
 
     /* Set the centralized network */
-    APP_DBG("Network config : APP_STARTUP_CENTRALIZED_COORD");
+    APP_DBG("Network config : APP_STARTUP_CENTRALIZED_END_DEVICE");
     config.startupControl = ZbStartTypeJoin;
 
     /* Using the default HA preconfigured Link Key */
@@ -250,6 +254,7 @@ static void APP_ZIGBEE_NwkForm(void)
     uint32_t bcast_timeout = 3;
     ZbNwkSet(zigbee_app_info.zb, ZB_NWK_NIB_ID_NetworkBroadcastDeliveryTime, &bcast_timeout, sizeof(bcast_timeout));
     APP_ZIGBEE_InitDevTemp();
+    APP_ZIGBEE_InitDevHumi();
   }
 }
 
@@ -286,6 +291,21 @@ static void APP_ZIGBEE_InitDevTemp()
   }
 }
 
+/* Initialize current humidity */
+static void APP_ZIGBEE_InitDevHumi()
+{
+  enum ZclStatusCodeT status;
+  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_humi_server, ZCL_WC_MEAS_ATTR_MEAS_VAL, (int16_t)5000);
+  if(status == ZCL_STATUS_SUCCESS)
+  {
+    APP_DBG("[DEV HUM] Device humidity initial value set at %d",(int16_t)5000);
+    BSP_LED_On(LED_GREEN);
+  }
+  else
+  {
+    APP_DBG("[DEV HUM]Failed to initialize initial humidity");
+  }
+}
 
 /*************************************************************
  * ZbStartupWait Blocking Call
