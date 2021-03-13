@@ -28,6 +28,8 @@
 #include "stm32wbxx_core_interface_def.h"
 #include "zigbee_types.h"
 #include "stm32_seq.h"
+#include "zigbee.h"
+#include "zcl/zcl.basic.h"
 
 #include <assert.h>
 #include "zcl/zcl.h"
@@ -139,6 +141,13 @@ void APP_ZIGBEE_Init(void)
  * @param  None
  * @retval None
  */
+struct ZbZclBasicServerDefaults defaultCustom;
+
+char mfr_name[] = {7, 'G', 'R', 'A', 'N', 'Y', 'Y'};
+char model_name[] = {6, 'T', 'E', 'M', 'P', 'I'};
+char date_code[] = {9, '2', '6', '0', '2', '2', '0', '2', '1'};
+
+
 static void APP_ZIGBEE_StackLayersInit(void)
 {
   APP_DBG("APP_ZIGBEE_StackLayersInit");
@@ -146,6 +155,16 @@ static void APP_ZIGBEE_StackLayersInit(void)
   zigbee_app_info.zb = ZbInit(0U, NULL, NULL);
   assert(zigbee_app_info.zb != NULL);
 
+  defaultCustom.app_version = 0;
+  defaultCustom.stack_version = 10;
+  defaultCustom.hw_version = 0;
+
+  memcpy(defaultCustom.mfr_name, mfr_name, sizeof(mfr_name));
+  memcpy(defaultCustom.model_name, model_name, sizeof(model_name));
+  memcpy(defaultCustom.date_code, date_code, sizeof(date_code));
+  defaultCustom.power_source = ZCL_BASIC_POWER_BATTERY;
+  memcpy(defaultCustom.sw_build_id, date_code, sizeof(date_code));
+  ZbZclBasicServerConfigDefaults(zigbee_app_info.zb, &defaultCustom);
   /* Create the endpoint and cluster(s) */
   APP_ZIGBEE_ConfigEndpoints();
 
@@ -466,6 +485,8 @@ static void APP_ZIGBEE_ParseTempValue()
  * @param  None
  * @retval None
  */
+uint16_t current_temp_ram = 0;
+
 static void APP_ZIGBEE_SW1_Process()
 {
   int16_t current_temp ;
@@ -490,6 +511,7 @@ static void APP_ZIGBEE_SW1_Process()
  
   /* Increase +0.1C */
   current_temp += 10;
+  current_temp_ram += 10;
   
   /* Write new current temperature */
   status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
@@ -528,6 +550,8 @@ static void APP_ZIGBEE_SW2_Process()
  
   /* Decrease +0.1C */
   current_temp -= 10;
+  current_temp_ram -= 10;
+
   
   /* Write new current temperature */
   status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
