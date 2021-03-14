@@ -329,6 +329,50 @@ void HAL_RTC_MspDeInit(RTC_HandleTypeDef* hrtc)
 
 /* USER CODE BEGIN 1 */
 
+void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
+{
+	if (hi2c->Instance == I2C3)
+	{
+		GPIO_InitTypeDef GPIO_InitStruct;
+		GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+		GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+		GPIO_InitStruct.Pull = GPIO_PULLUP;
+		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+		GPIO_InitStruct.Alternate = GPIO_AF4_I2C3;
+		__GPIOC_CLK_ENABLE();
+		HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+		__I2C3_CLK_ENABLE();
+	}
+}
+
+void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+{
+	if (hi2c->Instance == I2C3)
+	{
+		__I2C3_CLK_DISABLE();
+		HAL_GPIO_DeInit(GPIOC, GPIO_PIN_0|GPIO_PIN_1);
+	}
+}
+
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
+{
+	if (htim->Instance == TIM2) {
+		__HAL_RCC_TIM2_CLK_ENABLE();
+		HAL_NVIC_SetPriority(TIM2_IRQn, 3, 0);
+		HAL_NVIC_EnableIRQ(TIM2_IRQn);
+	}
+}
+
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *htim)
+{
+	if (htim->Instance == TIM2) {
+		__HAL_RCC_TIM2_CLK_DISABLE();
+		HAL_NVIC_DisableIRQ(TIM2_IRQn);
+	}
+}
+
+
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

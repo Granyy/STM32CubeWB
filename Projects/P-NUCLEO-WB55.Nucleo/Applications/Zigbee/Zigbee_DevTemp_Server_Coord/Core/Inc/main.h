@@ -42,7 +42,7 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
+extern TIM_HandleTypeDef tim2;
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/

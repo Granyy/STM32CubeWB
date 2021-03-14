@@ -407,5 +407,10 @@ IPCC_C1_RX_IRQHandler(void)
     return;
 }
 
+void TIM2_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&tim2);
+}
+
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

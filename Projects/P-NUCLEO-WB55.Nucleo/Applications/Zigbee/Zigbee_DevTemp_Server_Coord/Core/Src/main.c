@@ -53,6 +53,8 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_lpuart1_tx;
 DMA_HandleTypeDef hdma_usart1_tx;
 RTC_HandleTypeDef hrtc;
+I2C_HandleTypeDef i2c3;
+TIM_HandleTypeDef tim2;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -60,6 +62,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 void MX_LPUART1_UART_Init(void);
 void MX_USART1_UART_Init(void);
+void i2c_init(void);
 static void MX_RF_Init(void);
 static void MX_RTC_Init(void);
 
@@ -99,6 +102,8 @@ int main(void)
     MX_DMA_Init();
     MX_RF_Init();
     MX_RTC_Init();
+    i2c_init();
+    timer_init();
 
     /* Init the full application */
     APPE_Init();
@@ -107,7 +112,6 @@ int main(void)
 
     while (1) {
         UTIL_SEQ_Run( UTIL_SEQ_DEFAULT );
-
     }
 
 }
@@ -175,6 +179,78 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 }
+
+void TIMER_SetPeriod(TIM_HandleTypeDef *htim, uint32_t period_ms) {
+	uint8_t resolution = 0;
+	uint32_t max = 0;
+	if (htim->Instance == TIM2)
+	{
+		resolution = 32;
+		max = UINT32_MAX;
+	}
+	else
+	{
+	    Error_Handler();
+	}
+
+	uint64_t clkCalc = ((uint64_t) (SystemCoreClock / 1000)) * period_ms;
+
+	uint64_t presCalc = (clkCalc >> resolution);
+	if (presCalc > UINT16_MAX) {
+		//APP_DBG("[WARNING] Prescaler resolution is too low for this period\r\n");
+		presCalc = max;
+	}
+
+	uint64_t periodCalc = clkCalc / (presCalc + 1);
+	if (periodCalc > max) {
+		//APP_DBG("[WARNING] Counter resolution is too low for this period\r\n");
+		periodCalc = max;
+	}
+
+	htim->Init.Period = periodCalc - 1;
+	htim->Init.Prescaler = presCalc;
+	htim->Init.ClockDivision = 0;
+	htim->Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim->Init.RepetitionCounter = 0;
+}
+
+uint8_t cnt = 0;
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+
+	if (htim->Instance == TIM2) {
+		// Call something
+		cnt++;
+	}
+}
+
+void timer_init(void)
+{
+	tim2.Instance = TIM2;
+	tim2.Channel = HAL_TIM_ACTIVE_CHANNEL_1;
+	TIMER_SetPeriod(&tim2, 1000);
+
+	if (HAL_TIM_Base_Init(&tim2) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	__HAL_TIM_CLEAR_FLAG(&tim2, TIM_IT_UPDATE);
+	if (HAL_TIM_Base_Start_IT(&tim2) != HAL_OK) {
+		//TIMER_ErrorHandler();
+	}
+}
+
+void i2c_init(void)
+{
+    i2c3.Instance = I2C3;
+    i2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	if (HAL_I2C_Init(&i2c3) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
+
 
 /**
   * @brief LPUART1 Initialization Function
