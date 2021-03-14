@@ -32,6 +32,13 @@
 #include <assert.h>
 #include "zcl/zcl.h"
 #include "zcl/zcl.poll.control.h"
+#include "zcl/zcl.device.temp.h"
+#include "zcl/zcl.temp.meas.h"
+#include "zcl/zcl.water.content.meas.h"
+#include "zigbee.aps.h"
+#include "zcl/zcl.basic.h"
+
+
 
 /* Private defines -----------------------------------------------------------*/
 #define APP_ZIGBEE_STARTUP_FAIL_DELAY               500U
@@ -60,6 +67,7 @@ static void APP_ZIGBEE_SW1_Process(void);
 
 static void APP_ZIGBEE_PollControl_Server_Init(void);
 static void APP_ZIGBEE_PollControl_Server_ShowAttr(void);
+static void APP_ZIGBEE_SW1_Process_Temp(void);
 static void APP_ZIGBEE_PollControl_Server_FillingBindingTable(void);
 static void APP_ZIGBEE_PollControl_Server_CheckinRsp_cb(struct ZbZclClusterT *clusterPtr, struct zcl_poll_checkin_rsp_t *rsp_info, 
                                                struct ZbZclAddrInfoT *srcInfo, void *arg);
@@ -71,6 +79,10 @@ static void APP_ZIGBEE_CheckWirelessFirmwareInfo(void);
 static void Wait_Getting_Ack_From_M0(void);
 static void Receive_Ack_From_M0(void);
 static void Receive_Notification_From_M0(void);
+
+
+static void APP_ZIGBEE_InitDevTemp(void);
+static void APP_ZIGBEE_InitDevHumi(void);
 
 /* Private variables -----------------------------------------------*/
 static TL_CmdPacket_t *p_ZIGBEE_otcmdbuffer;
@@ -91,6 +103,8 @@ struct zigbee_app_info {
   uint32_t join_delay;
   
   struct ZbZclClusterT *pollcontrol_server;
+  struct ZbZclClusterT *device_temp_server;
+  struct ZbZclClusterT *device_humi_server;
 };
 static struct zigbee_app_info zigbee_app_info;
 
@@ -123,7 +137,7 @@ static void APP_ZIGBEE_PollControl_Server_CheckinRsp_cb(struct ZbZclClusterT *cl
   
   if(rsp_info->start_fast_poll){
     APP_DBG("[POLL CONTROL] Fast Poll enabled for %d seconds.\n", rsp_info->fast_poll_timeout/4); 
-    BSP_LED_On(LED_GREEN);
+    //BSP_LED_On(LED_GREEN);
     APP_DBG("GREEN LED ON\n");
     HW_TS_Start(TS_ID1, POLL_CONVERT_QS_TO_MS(rsp_info->fast_poll_timeout)*HW_TS_SERVER_1MS_NB_TICKS);
   } else {
@@ -178,6 +192,9 @@ static void APP_ZIGBEE_PollControl_Server_ShowAttr(void){
   } else {
     APP_DBG("[POLL CONTROL] Fast poll timeout: %ds\n", fast_timeout/4);
   }
+
+  APP_ZIGBEE_SW1_Process_Temp();
+
 }
 
 /**
@@ -308,12 +325,31 @@ void APP_ZIGBEE_Init(void)
  * @param  None
  * @retval None
  */
+
+struct ZbZclBasicServerDefaults defaultCustom;
+
+char mfr_name[] = {7, 'G', 'R', 'A', 'N', 'Y', 'Y', '\0'};
+char model_name[] = {6, 'T', 'E', 'M', 'P', 'I', '\0'};
+char date_code[] = {9, '2', '6', '0', '2', '2', '0', '2', '1', '\0'};
+
 static void APP_ZIGBEE_StackLayersInit(void)
 {
   APP_DBG("APP_ZIGBEE_StackLayersInit");
 
   zigbee_app_info.zb = ZbInit(0U, NULL, NULL);
   assert(zigbee_app_info.zb != NULL);
+
+  defaultCustom.app_version = 0;
+    defaultCustom.stack_version = 10;
+    defaultCustom.hw_version = 0;
+
+    memcpy(defaultCustom.mfr_name, mfr_name, sizeof(mfr_name));
+    memcpy(defaultCustom.model_name, model_name, sizeof(model_name));
+    memcpy(defaultCustom.date_code, date_code, sizeof(date_code));
+    defaultCustom.power_source = ZCL_BASIC_POWER_BATTERY;
+    memcpy(defaultCustom.sw_build_id, date_code, sizeof(date_code));
+    ZbZclBasicServerConfigDefaults(zigbee_app_info.zb, &defaultCustom);
+
 
   /* Create the endpoint and cluster(s) */
   APP_ZIGBEE_ConfigEndpoints();
@@ -357,6 +393,21 @@ static void APP_ZIGBEE_ConfigEndpoints(void)
                                                              &ZbZclPollControlServerCallbacks, NULL);
   assert(zigbee_app_info.pollcontrol_server != NULL);
   ZbZclClusterEndpointRegister(zigbee_app_info.pollcontrol_server); 
+
+
+  /* Endpoint: SW1_ENDPOINT */
+  //req.endpoint = SW1_ENDPOINT;
+  //ZbZclAddEndpoint(zigbee_app_info.zb, &req, &conf);
+  assert(conf.status == ZB_STATUS_SUCCESS);
+  ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_TEMPERATURE, true);
+  ZbApsmeEndpointClusterListAppend(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_HUMIDITY, true);
+
+  /* device temperature Server */
+  zigbee_app_info.device_temp_server = ZbZclTempMeasServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_TEMP_MEAS_MIN_MEAS_VAL_MIN, ZCL_TEMP_MEAS_MAX_MEAS_VAL_MAX, 1);
+  assert(zigbee_app_info.device_temp_server != NULL);
+  zigbee_app_info.device_humi_server = ZbZclWaterContentMeasServerAlloc(zigbee_app_info.zb, SW1_ENDPOINT, ZCL_CLUSTER_MEAS_HUMIDITY, ZCL_WC_MEAS_MIN_MEAS_VAL_MIN, ZCL_WC_MEAS_MIN_MEAS_VAL_MAX);
+  assert(zigbee_app_info.device_humi_server != NULL);
+
 } /* APP_ZIGBEE_ConfigEndpoints */
 
 /**
@@ -400,7 +451,7 @@ static void APP_ZIGBEE_NwkForm(void)
 
     if (status == ZB_STATUS_SUCCESS) {
       zigbee_app_info.join_delay = 0U;
-      BSP_LED_On(LED_BLUE);
+      //BSP_LED_On(LED_BLUE);
     }
     else
     {
@@ -417,14 +468,53 @@ static void APP_ZIGBEE_NwkForm(void)
   else
   {
 
+	// group addr needed ? Not sur ;)
+
+
+
     /* Since we're using group addressing (broadcast), shorten the broadcast timeout */
     uint32_t bcast_timeout = 3;
     ZbNwkSet(zigbee_app_info.zb, ZB_NWK_NIB_ID_NetworkBroadcastDeliveryTime, &bcast_timeout, sizeof(bcast_timeout));
     
+    APP_ZIGBEE_InitDevTemp();
+    APP_ZIGBEE_InitDevHumi();
+
     /* Starting application init task */
     UTIL_SEQ_SetTask(1U << CFG_TASK_ZIGBEE_APP_START, CFG_SCH_PRIO_0);
   }
 } /* APP_ZIGBEE_NwkForm */
+
+/* Initialize current temperature */
+static void APP_ZIGBEE_InitDevTemp()
+{
+  enum ZclStatusCodeT status;
+  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, (int16_t)2000);
+  if(status == ZCL_STATUS_SUCCESS)
+  {
+    APP_DBG("[DEV TEMP] Device Temperature initial value set at %d",(int16_t)2000);
+    //BSP_LED_On(LED_GREEN);
+  }
+  else
+  {
+    APP_DBG("[DEV TEMP]Failed to initialize initial Temperature");
+  }
+}
+
+/* Initialize current humidity */
+static void APP_ZIGBEE_InitDevHumi()
+{
+  enum ZclStatusCodeT status;
+  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_humi_server, ZCL_WC_MEAS_ATTR_MEAS_VAL, (int16_t)5000);
+  if(status == ZCL_STATUS_SUCCESS)
+  {
+    APP_DBG("[DEV HUM] Device humidity initial value set at %d",(int16_t)5000);
+    //BSP_LED_On(LED_GREEN);
+  }
+  else
+  {
+    APP_DBG("[DEV HUM]Failed to initialize initial humidity");
+  }
+}
 
 /*************************************************************
  * ZbStartupWait Blocking Call
@@ -550,6 +640,37 @@ static void APP_ZIGBEE_CheckWirelessFirmwareInfo(void)
  * @param  None
  * @retval None
  */
+
+static void APP_ZIGBEE_SW1_Process_Temp()
+{
+  int16_t current_temp ;
+  enum ZclDataTypeT type = ZCL_DATATYPE_SIGNED_16BIT;
+  enum ZclStatusCodeT status;
+  uint64_t epid = 0U;
+
+  if(zigbee_app_info.zb == NULL){
+    return;
+  }
+
+  /* Check if the router joined the network */
+  if (ZbNwkGet(zigbee_app_info.zb, ZB_NWK_NIB_ID_ExtendedPanId, &epid, sizeof(epid)) != ZB_STATUS_SUCCESS) {
+    return;
+  }
+  if (epid == 0U) {
+    return;
+  }
+
+  /* Read the current temperature */
+  current_temp = (int16_t)ZbZclAttrIntegerRead(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, &type, &status);
+
+  /* Increase +0.1C */
+  current_temp += 10;
+
+  /* Write new current temperature */
+  status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
+  APP_DBG("[DEV TEMP] Increase Temp by +0.1C");
+}
+
 static void APP_ZIGBEE_SW1_Process(void)
 {
   uint64_t epid = 0U;

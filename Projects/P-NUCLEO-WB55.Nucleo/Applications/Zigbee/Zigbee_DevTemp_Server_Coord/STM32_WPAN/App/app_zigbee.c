@@ -232,7 +232,6 @@ static void APP_ZIGBEE_NwkForm(void)
 
     /* Set the centralized network */
     APP_DBG("Network config : APP_STARTUP_CENTRALIZED_END_DEVICE");
-    config.touchlink.zb_info = ZCL_TL_ZBINFO_TYPE_END_DEVICE;
     config.startupControl = ZbStartTypeJoin;
 
     /* Using the default HA preconfigured Link Key */
@@ -512,7 +511,6 @@ static void APP_ZIGBEE_SW1_Process()
  
   /* Increase +0.1C */
   current_temp += 10;
-  current_temp_ram += 10;
   
   /* Write new current temperature */
   status = ZbZclAttrIntegerWrite(zigbee_app_info.device_temp_server, ZCL_TEMP_MEAS_ATTR_MEAS_VAL, current_temp);
