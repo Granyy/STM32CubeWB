@@ -384,7 +384,7 @@ static void APP_ZIGBEE_NwkForm(void)
     memcpy(config.security.preconfiguredLinkKey, sec_key_ha, ZB_SEC_KEYSIZE);   
     config.channelList.count = 1;
     config.channelList.list[0].page = 0;
-    config.channelList.list[0].channelMask = 1 << CHANNEL; /* Channel in use */
+    config.channelList.list[0].channelMask = WPAN_CHANNELMASK_2400MHZ;//1 << CHANNEL; /* Channel in use */
     
     /* Add Sleepy End device configuration */
     config.capability &= ~(MCP_ASSOC_CAP_RXONIDLE | MCP_ASSOC_CAP_DEV_TYPE | MCP_ASSOC_CAP_ALT_COORD);
